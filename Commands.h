@@ -7,62 +7,68 @@
 #define COMMAND_MAX_ARGS (20)   //TODO: CHECK FOR SEGFAULT
 
 class Command {
-    // TODO: Add your data members
-public:
+// TODO: Add your data members
+ public:
     const char* cmd;
 
-    Command(const char* cmd_line);
-    virtual ~Command();
-    virtual void execute() = 0;
-    const char* get_cmd_line() { return cmd; }
-    //virtual void prepare();
-    //virtual void cleanup();
-    // TODO: Add your extra methods if needed
+  explicit Command(const char* cmd_line);
+  virtual ~Command() = default;
+  virtual void execute() = 0;
+  //virtual void prepare();
+  //virtual void cleanup();
+  // TODO: Add your extra methods if needed
 };
 
 class BuiltInCommand : public Command {
-public:
-    BuiltInCommand(const char* cmd_line);
-    virtual ~BuiltInCommand() {}
+ public:
+  explicit BuiltInCommand(const char* cmd_line);
+  virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
-public:
-    ExternalCommand(const char* cmd_line);
-    virtual ~ExternalCommand() {}
-    void execute() override;
+ public:
+  ExternalCommand(const char* cmd_line);
+  virtual ~ExternalCommand() {}
+  void execute() override;
 };
 
 class PipeCommand : public Command {
-    // TODO: Add your data members
-public:
-    PipeCommand(const char* cmd_line);
-    virtual ~PipeCommand() {}
-    void execute() override;
+  // TODO: Add your data members
+ public:
+  PipeCommand(const char* cmd_line);
+  virtual ~PipeCommand() {}
+  void execute() override;
 };
 
 class RedirectionCommand : public Command {
-    // TODO: Add your data members
-public:
-    explicit RedirectionCommand(const char* cmd_line);
-    virtual ~RedirectionCommand() {}
-    void execute() override;
-    //void prepare() override;
-    //void cleanup() override;
+ std::string filename;
+
+ bool toAppend;
+ bool redirected = true;
+
+ int monitor_out;
+ int opened_file_d;
+
+ public:
+  explicit RedirectionCommand(const char* cmd_line);
+  virtual ~RedirectionCommand() = default;
+  void execute() override;
+  void prepare();
+  void cleanup();
 };
 
 
 
 class ChpromptCommand : public BuiltInCommand {
 public:
-    explicit ChpromptCommand(const char* cmd_line);
+    explicit ChpromptCommand(const char *cmd_line);
     virtual  ~ChpromptCommand() = default;
     void execute() override;
 };
 
 class PathWorkDirCommand : public BuiltInCommand {
 public:
-    explicit PathWorkDirCommand(const char* cmd_line);
+    explicit PathWorkDirCommand(const char *cmd_line);
 
     virtual  ~PathWorkDirCommand() = default;
 
@@ -70,10 +76,11 @@ public:
 };
 
 class ChangeDirCommand : public BuiltInCommand {
-    char** plastPwd;
-    ChangeDirCommand(const char* cmd_line, char** plastPwd);
-    virtual ~ChangeDirCommand() {}
-    void execute() override;
+public:
+  char **plastPwd;
+  ChangeDirCommand(const char *cmd_line, char **plastPwd);
+  virtual ~ChangeDirCommand() {}
+  void execute() override;
 };
 /*
 class GetCurrDirCommand : public BuiltInCommand {
@@ -84,10 +91,10 @@ class GetCurrDirCommand : public BuiltInCommand {
 };
 */
 class ShowPidCommand : public BuiltInCommand {
-public:
-    ShowPidCommand(const char* cmd_line);
-    virtual ~ShowPidCommand() {}
-    void execute() override;
+ public:
+  ShowPidCommand(const char* cmd_line);
+  virtual ~ShowPidCommand() {}
+  void execute() override;
 };
 
 
@@ -99,9 +106,6 @@ class QuitCommand : public BuiltInCommand {
     virtual ~QuitCommand() {}
     void execute() override;
 };
-
-
-
 
 class JobsList {
 public:
@@ -164,28 +168,27 @@ public:
 };
 
 
+
 class SmallShell {
-private:
-    // TODO: Add your data members
-    SmallShell();
-public:
+ private:
+  // TODO: Add your data members
+  SmallShell();
+ public:
     std::string prompt;
     //pid_t pid;
-    const char* plastPwd;
-    //static JobsList jobs_list;
+    char *plastPwd;
 
-    Command* CreateCommand(const char* cmd_line);
-    SmallShell(SmallShell const&) = delete; // disable copy ctor
-    void operator=(SmallShell const&) = delete; // disable = operator
-    static SmallShell& getInstance() // make SmallShell singleton
-    {
-        static SmallShell instance; // Guaranteed to be destroyed.
-        // Instantiated on first use.
-        return instance;
-    }
-    ~SmallShell();
-    void executeCommand(const char* cmd_line);
-    // TODO: add extra methods as needed
+  Command *CreateCommand(const char* cmd_line);
+  SmallShell(SmallShell const&)      = delete; // disable copy ctor
+  void operator=(SmallShell const&)  = delete; // disable = operator
+  static SmallShell& getInstance() // make SmallShell singleton
+  {
+    static SmallShell instance; // Guaranteed to be destroyed.
+    // Instantiated on first use.
+    return instance;
+  }
+  ~SmallShell();
+  void executeCommand(const char* cmd_line);
+  // TODO: add extra methods as needed
 };
-
 #endif //SMASH_COMMAND_H_
