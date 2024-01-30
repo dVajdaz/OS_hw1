@@ -194,6 +194,7 @@ void JobsList::removeFinishedJobs() {
         }
 
     }
+    unfinished_size = job_vector.size();
 }
 
 void JobsList::removeJobById(int jobId) {
@@ -372,20 +373,16 @@ void ForegroundCommand::execute() {
     }
 
 
-
-
-
     QuitCommand::QuitCommand(const char* cmd_line, JobsList * jobs) : BuiltInCommand(cmd_line), jobs(jobs) {} // not sure, need to check
 
     void QuitCommand::execute() {
-        jobs->removeFinishedJobs();
         char* args[COMMAND_MAX_ARGS + 1];
         if (string(args[1]).compare("kill") == 0) {
             std::cout << "smash: sending SIGKILL signal to " << jobs->unfinished_size << " jobs:" << endl;
             jobs->killAllJobs();
         }
-        else
-            exit(0);
+        delete this;
+        exit(0);
         
     }
 
