@@ -352,3 +352,196 @@ void RedirectionCommand::execute() {
     }
     //cleanup();
 }
+
+/*----------------------------------------------------------Job Implementation----------------------------------------------------------*/
+
+JobsList::JobEntry::JobEntry(std::string& command_line, int job_id, pid_t job_pid, bool isStopped) : command_line(command_line),
+job_id(job_id),
+job_pid(job_pid),
+isStopped(isStopped) {}
+
+JobsList::JobsList() : max_job_id(1),
+job_vector(std::vector <JobEntry>()),
+ unfinished_size(0) {}
+
+void JobsList::killAllJobs() {
+    for (auto& job : job_vector) {
+        if (job.isStopped == false) {
+           std::cout << job.job_pid << ": " << job.command_line << endl;
+            kill(job.job_pid, SIGKILL);
+        }
+    }
+}
+
+void JobsList::addJob(Command* cmd, pid_t pid, bool isStopped = false) {
+    this->removeFinishedJobs();
+    if (job_vector.empty()) {
+        std::string cmd_line = cmd->get_cmd_line();
+        JobEntry job =  JobEntry(cmd_line, 1, pid); // how to create a new job entry? should i use new?
+        job_vector.push_back(job); // check if written well.
+        max_job_id = 1;
+    }
+    else {
+        std::string cmd_line = cmd->get_cmd_line();
+        JobEntry job =  JobEntry(cmd_line, max_job_id+1, pid); // how to create a new job entry? should i use new?????
+        job_vector.push_back(job); // check if written well.
+        max_job_id++;
+    }
+}
+
+void JobsList::removeFinishedJobs() {
+    if (job_vector.empty()) {
+        max_job_id = 1;
+        return;
+    }
+    else {
+        for (auto it = job_vector.begin(); it != job_vector.end(); ++it) {
+                auto job = *it;
+                int ret_wait = waitpid(job.job_pid, NULL, WNOHANG); // RETURN TO IT FOR LOGIC!!!!!!!!!!!!!!!!!!!!!!!!!
+                if (ret_wait == job.job_pid || ret_wait == -1) {
+                    job_vector.erase(it);
+                    --it;
+                }
+        }
+        int max_alive_job_id = 1;
+        for (auto& job : job_vector) {
+            if (job.job_id > max_alive_job_id)
+                max_alive_job_id = job.job_id;
+        }
+
+    }
+}
+
+void JobsList::removeJobById(int jobId) {
+    for (auto it = job_vector.begin(); it != job_vector.end(); ++it) {
+        auto job = *it;
+        if (job.job_id == jobId) {
+            job_vector.erase(it);
+            return;
+        }
+    }
+}
+
+JobsList::JobEntry* JobsList::getJobById(int jobId) {
+    for (auto& job : job_vector) {
+        if (job.job_id == jobId) {
+            return &job;
+        }
+    }
+    return nullptr;
+}
+
+JobsList::JobEntry* JobsList::getLastJob(int* lastJobId) {}
+
+JobsList::JobEntry* JobsList::getLastStoppedJob(int* jobId) {}
+
+bool JobsList::isListEmpty() {}
+
+
+// TODO: Implement functions for class, make sure vector is sorted by job_id number when created
+
+JobsCommand::JobsCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),  jobs(jobs) {}
+
+void JobsCommand::execute() {
+    jobs->removeFinishedJobs();
+    for (auto it = jobs->job_vector.begin(); it != jobs->job_vector.end(); ++it) { // iterating over vector of job list
+        auto job = *it;
+        std::cout << "[" << job.job_id << "] " << job.command_line << std::endl;
+    }
+}
+
+ForegroundCommand::ForegroundCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),  jobs(jobs) {} // not sure, need to check
+
+void ForegroundCommand::execute() {
+    jobs->removeFinishedJobs();
+    char* args[COMMAND_MAX_ARGS + 1];
+    int num_args = _parseCommandLine(this->cmd, args);
+    if (num_args > 2) {
+        std::cerr << "smash error: fg: invalid arguments" << std::endl;
+        return;
+    }
+    else if (num_args == 2) {
+        if (isNumber(args[1]) == false) { // TODO: Implement isNumber!
+            std::cerr << "smash error: fg: invalid arguments" << std::endl;
+            return;
+        }
+        else {
+            int job_id = std::atoi(args[1]);
+            if (jobs->getJobById(job_id) == NULL) {
+                std::cerr << "smash error: fg: job-id " << job_id << " does not exist" << endl;
+                return;
+            }
+            else {
+                JobsList::JobEntry* current_job = jobs->getJobById(job_id); // do i need to free it?
+                std::cout << current_job->command_line << " " << current_job->job_pid << std::endl;
+                // TODO: Wait for it to run, implement later
+                jobs->removeJobById(job_id);
+            }
+        }
+    }
+    else {
+        if (jobs->isListEmpty() == true) {
+            std::cerr << "smash error: fg: jobs list is empty" << std::endl;
+            return;
+        }
+        else {
+            JobsList::JobEntry* current_job = jobs->getJobById(jobs->max_job_id); // do i need to free it?
+            std::cout << current_job->command_line << " " << current_job->job_pid << std::endl;
+            // TODO: Wait for it to run, implement later
+            jobs->removeJobById(jobs->max_job_id);
+        }
+    }
+    }
+
+
+
+
+
+    QuitCommand::QuitCommand(const char* cmd_line, JobsList * jobs) : BuiltInCommand(cmd_line), jobs(jobs) {} // not sure, need to check
+
+    void QuitCommand::execute() {
+        jobs->removeFinishedJobs();
+        char* args[COMMAND_MAX_ARGS + 1];
+        if (string(args[1]).compare("kill") == 0) {
+            std::cout << "smash: sending SIGKILL signal to " << jobs->unfinished_size << " jobs:" << endl;
+            jobs->killAllJobs();
+        }
+        else
+            exit(0);
+        
+    }
+
+    KillCommand::KillCommand(const char* cmd_line, JobsList * jobs) : BuiltInCommand(cmd_line), jobs(jobs){} // not sure, need to check
+
+    void KillCommand::execute() {
+        jobs->removeFinishedJobs();
+        char* args[COMMAND_MAX_ARGS + 1];
+        int num_args = _parseCommandLine(this->cmd, args);
+        if (num_args != 3) {
+            std::cerr << "smash error: kill: invalid arguments" << std::endl;
+        }
+        else {
+            if (isNumber(args[1]) == false || isNumber(args[2]) == false) { // TODO: Implement isNumber!
+                std::cerr << "smash error: kill: invalid arguments" << std::endl;
+                return;
+            }
+            else {
+                int job_id = std::atoi(args[2]);
+                int signal_number = std::atoi(args[1]);
+                if (jobs->getJobById(job_id) == NULL) {
+                    std::cerr << "smash error: fg: job-id " << job_id << " does not exist" << std::endl;
+                    return;
+                }
+                else {
+                    job_pid == jobs->getJobById(job_id)->job_pid;
+                    if (kill(job_pid, signum) == -1) { // Not Successful
+                        perror("smash error: kill failed");
+                        return;
+                    }
+                    else {
+                        std::cout << "signal number " << signal_number << " was sent to pid " << job_pid << std::endl;
+                    }
+                }
+
+            }
+        }
