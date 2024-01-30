@@ -9,10 +9,10 @@
 class Command {
 // TODO: Add your data members
  public:
-    char *cmd;
+    const char* cmd;
 
-  Command(const char* cmd_line);
-  virtual ~Command();
+  explicit Command(const char* cmd_line);
+  virtual ~Command() = default;
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
@@ -21,7 +21,7 @@ class Command {
 
 class BuiltInCommand : public Command {
  public:
-  BuiltInCommand(const char* cmd_line);
+  explicit BuiltInCommand(const char* cmd_line);
   virtual ~BuiltInCommand() {}
 };
 
@@ -41,17 +41,20 @@ class PipeCommand : public Command {
 };
 
 class RedirectionCommand : public Command {
- // TODO: Add your data members
- char* cmd;
- std::string file;
+ std::string filename;
+
  bool toAppend;
+ bool redirected = true;
+
+ int monitor_out;
+ int opened_file_d;
 
  public:
   explicit RedirectionCommand(const char* cmd_line);
-  virtual ~RedirectionCommand() {}
+  virtual ~RedirectionCommand() = default;
   void execute() override;
   void prepare();
-  //void cleanup() override;
+  void cleanup();
 };
 
 
@@ -73,8 +76,9 @@ public:
 };
 
 class ChangeDirCommand : public BuiltInCommand {
+public:
   char **plastPwd;
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
+  ChangeDirCommand(const char *cmd_line, char **plastPwd);
   virtual ~ChangeDirCommand() {}
   void execute() override;
 };
@@ -102,7 +106,6 @@ class QuitCommand : public BuiltInCommand {
   virtual ~QuitCommand() {}
   void execute() override;
 };
-
 
 
 
@@ -158,6 +161,7 @@ class ChmodCommand : public BuiltInCommand {
 };
 
 
+
 class SmallShell {
  private:
   // TODO: Add your data members
@@ -165,7 +169,7 @@ class SmallShell {
  public:
     std::string prompt;
     //pid_t pid;
-    const char *plastPwd;
+    char *plastPwd;
 
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor

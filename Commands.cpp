@@ -27,18 +27,15 @@ string _ltrim(const std::string& s)
   size_t start = s.find_first_not_of(WHITESPACE);
   return (start == std::string::npos) ? "" : s.substr(start);
 }
-
 string _rtrim(const std::string& s)
 {
   size_t end = s.find_last_not_of(WHITESPACE);
   return (end == std::string::npos) ? "" : s.substr(0, end + 1);
 }
-
 string _trim(const std::string& s)
 {
   return _rtrim(_ltrim(s));
 }
-
 int _parseCommandLine(const char* cmd_line, char** args) {
   FUNC_ENTRY()
   int i = 0;
@@ -54,11 +51,21 @@ int _parseCommandLine(const char* cmd_line, char** args) {
   FUNC_EXIT()
 }
 
+void free_args(char **args, int arg_num) {
+    if (!args)
+        return;
+
+    for (int i = 0; i < arg_num; i++) {
+        if (args[i])
+            free(args[i]);
+    }
+    //free(args);
+}
+
 bool _isBackgroundComamnd(const char* cmd_line) {
   const string str(cmd_line);
   return str[str.find_last_not_of(WHITESPACE)] == '&';
 }
-
 void _removeBackgroundSign(char* cmd_line) {
   const string str(cmd_line);
   // find last character other than spaces
@@ -77,32 +84,35 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
-
 //TODO: Should add pid field?
-SmallShell::SmallShell() : prompt("smash"), plastPwd(nullptr){
-// TODO: add your implementation
-}
+SmallShell::SmallShell() : prompt("smash"), plastPwd(nullptr){}
 
-SmallShell::~SmallShell() {
-// TODO: add your implementation
-}
+SmallShell::~SmallShell() {}
 
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
+Command::Command(const char *cmd_line) : cmd(cmd_line) {}
 Command * SmallShell::CreateCommand(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
+  //TODO: Consider & in the end of the command. Should be skipped in case the command is basic
   if (firstWord.compare("chprompt") == 0) {
       return new ChpromptCommand(cmd_line);
   }
+  /*
   else if (firstWord.compare("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
-  }
+  }*/
   else if (firstWord.compare("showpid") == 0) {
     return new ShowPidCommand(cmd_line);
+  }
+  else if (firstWord.compare("pwd") == 0) {
+      return new PathWorkDirCommand(cmd_line);
+  }
+  else if (firstWord.compare("cd") == 0) {
+      return new ChangeDirCommand(cmd_line, &plastPwd);
   }
   else {
     return new ExternalCommand(cmd_line);
@@ -110,42 +120,45 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
   return nullptr;
 }
-
 void SmallShell::executeCommand(const char *cmd_line) {
-  // TODO: Add your implementation here
   // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
+  Command* cmd = CreateCommand(cmd_line);
+  cmd->execute();
+  delete cmd;
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 
 
 /*----------------------------------------------------------BUILT IN COMMANDS----------------------------------------------------------*/
-ChpromptCommand::ChpromptCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
+BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
+}
 
+ChpromptCommand::ChpromptCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 }
 void ChpromptCommand::execute() {
-    char* args[COMMAND_MAX_ARGS + 1];   //TODO: CHECK FOR SEGFAULT
+    char* args[COMMAND_MAX_ARGS + 1];
     int num_args = _parseCommandLine(this->cmd, args);
 
-    SmallShell &shell = SmallShell::getInstance();
+    SmallShell &smash = SmallShell::getInstance();
 
     if(num_args>1){
-        shell.prompt = args[1];
+        smash.prompt = args[1];
     } else if (num_args<1){
         //TODO: ERROR HANDLING?
     }
     else {
-        shell.prompt = "smash";
+        smash.prompt = "smash";
     }
+
+    free_args(args, num_args);
 }
 
 ShowPidCommand::ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
 //TODO: Should switch to shell.pid??
 void ShowPidCommand::execute() {
-    //SmallShell &shell = SmallShell::getInstance();
-    std::cout << "smash pid is " << getpid();
+    //SmallShell &smash = SmallShell::getInstance();
+    std::cout << "smash pid is " << getpid()<< endl;
 }
 
 PathWorkDirCommand::PathWorkDirCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
@@ -166,43 +179,40 @@ void ChangeDirCommand::execute() {
     char* args[COMMAND_MAX_ARGS + 1];
     int num_args = _parseCommandLine(this->cmd, args);
 
-    size_t maxPathLength = (size_t) pathconf(".", _PC_PATH_MAX);
-    char buffer[maxPathLength];
-
-    if (getcwd(buffer, maxPathLength) == NULL) {
+    char *buffer = (char *) malloc((size_t) pathconf(".", _PC_PATH_MAX));
+    if (getcwd(buffer, (size_t) pathconf(".", _PC_PATH_MAX)) == NULL) {
         perror("smash error: getcwd failed");
-        //free_args(args, num_of_args);
+        free(buffer);
+        free_args(args, num_args);
         return;
     }
 
-    SmallShell &shell = SmallShell::getInstance();
-
     if(num_args > 2){
-        std::cout << "smash error: cd: too many arguments";
-    } else if(*args[1] == '-'){                                 //Changing to previous working dir
-        if(!*this->plastPwd){
-            std::cout << "smash error: cd: OLDPWD not set";
-        } else {
-            if(chdir(shell.plastPwd) == -1){                    //chdir SYSCALL FAILED
-                perror("smash error: chdir failed");
-                //free(args);
-            } else {
-                //if (*plastPwd)
-                //  free(*plastPwd);
-                shell.plastPwd = buffer;
-            }
-        }
-    } else {                                                    //Changing to given directory
-        if(chdir(args[1]) == -1){                               //chdir SYSCALL FAILED
-            perror("smash error: chdir failed");
-            //free(args);
-            return;
-        } else {
-            //if (*plastPwd)
-            //  free(*plastPwd);
-            shell.plastPwd = buffer;
-        }
+        std::cerr << "smash error: cd: too many arguments" << endl;
+    } else if (num_args == 1) {
+        //TODO: ERROR HANDLING?
     }
+    else if ((std::string)args[1] == "-"){   //Changing to previous working dir
+        if(!(*plastPwd)){
+            std::cerr << "smash error: cd: OLDPWD not set" << endl;
+            free_args(args, num_args);
+        } else if(chdir(*plastPwd) == -1) {
+            perror("smash error: chdir failed");
+            free_args(args, num_args);
+        } else {
+            if (*plastPwd)
+                free(*plastPwd);
+            *plastPwd = buffer;
+        }
+    } else if(chdir(args[1]) == -1) {    //Changing to given directory
+        perror("smash error: chdir failed");
+        free_args(args, num_args);
+    } else {
+        if (*plastPwd)
+            free(*plastPwd);
+        *plastPwd = buffer;
+    }
+    free_args(args, num_args);
 }
 
 
@@ -226,6 +236,7 @@ bool arrayContainsSpecialCharacter(char* array[], size_t size) {
     }
     return false; // No special character found in any array element
 }
+
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {}
 void ExternalCommand::execute() {
     std::string trim_cmd = _trim(string(this->cmd));
@@ -234,9 +245,10 @@ void ExternalCommand::execute() {
     char *bash_args[] = {bash_exec, bash_flag, const_cast<char *>(trim_cmd.c_str()), nullptr};
 
     bool is_background = _isBackgroundComamnd(this->cmd);
-    if (is_background)
-        _removeBackgroundSign(this->cmd);
 
+    /*if (is_background)
+        _removeBackgroundSign(this->cmd);
+    */
     pid_t pid = fork();
     if (pid == 0) {                                                  //CHILD PROCESS
         char *args[COMMAND_MAX_ARGS + 1];
@@ -280,13 +292,12 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
         if (strstr(args[i], ">") != nullptr) {
             outputRedirect = ">";
             this->toAppend = false;
-
-            this->file = _trim(args[i+1]);                         //TODO: Should use strcpy for the file field??
+            this->filename = _trim(args[i+1]);                         //TODO: Should use strcpy for the file field??
             break;
         } else if (strstr(args[i], ">>") != nullptr) {
             outputRedirect = ">>";
             this->toAppend = true;
-            this->file = _trim(args[i+1]);
+            this->filename = _trim(args[i+1]);
             break;
         }
     }
@@ -295,9 +306,49 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
         this->prepare();
     }
 
-    
+    free_args(args, num_args);
 }
-
 void RedirectionCommand::prepare() {
+    this->monitor_out = dup(1);
 
+    if (close(1) == -1) {
+        perror("smash error: close failed");
+        return;
+    }
+
+    if(this->toAppend){
+        this->opened_file_d = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0666);
+    } else {
+        this->opened_file_d = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0666);
+    }
+
+    if(opened_file_d == -1){
+        perror("smash error: open failed");
+        this->redirected = false;
+    }
+}
+void RedirectionCommand::cleanup() {
+    if (dup2(this->monitor_out, 1) == -1)
+        perror("smash error: dup2 failed");
+
+    if (close(this->monitor_out) == -1)
+        perror("smash error: close failed");
+
+    if(close(this->opened_file_d) == -1)
+        perror("smash error: close failed");
+}
+void RedirectionCommand::execute() {
+    if(this->redirected){
+        SmallShell &smash = SmallShell::getInstance();
+
+        const char* redirectPos = strpbrk(cmd, ">");
+        size_t length = redirectPos - cmd;
+        char* command_line = (char *) malloc(sizeof(char) * (length + 1));
+        strncpy(command_line, cmd, length);
+        command_line[length] = '\0'; // Null-terminate the string
+
+        smash.executeCommand(command_line);              //TODO: command_line is then built into Command object and deleted after. Requires Valgrind check!
+        cleanup();
+    }
+    //cleanup();
 }
