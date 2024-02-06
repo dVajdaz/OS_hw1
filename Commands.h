@@ -7,68 +7,68 @@
 #define COMMAND_MAX_ARGS (20)   //TODO: CHECK FOR SEGFAULT
 
 class Command {
-// TODO: Add your data members
- public:
+    // TODO: Add your data members
+public:
     const char* cmd;
 
-  explicit Command(const char* cmd_line);
-  virtual ~Command() = default;
-  virtual void execute() = 0;
-  //virtual void prepare();
-  //virtual void cleanup();
-  // TODO: Add your extra methods if needed
+    explicit Command(const char* cmd_line);
+    virtual ~Command() = default;
+    virtual void execute() = 0;
+    //virtual void prepare();
+    //virtual void cleanup();
+    const char* get_cmd_line() { return cmd; }
 };
 
 class BuiltInCommand : public Command {
- public:
-  explicit BuiltInCommand(const char* cmd_line);
-  virtual ~BuiltInCommand() {}
+public:
+    explicit BuiltInCommand(const char* cmd_line);
+    virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
- public:
-  ExternalCommand(const char* cmd_line);
-  virtual ~ExternalCommand() {}
-  void execute() override;
+public:
+    ExternalCommand(const char* cmd_line);
+    virtual ~ExternalCommand() {}
+    void execute() override;
 };
 
 class PipeCommand : public Command {
-  // TODO: Add your data members
- public:
-  PipeCommand(const char* cmd_line);
-  virtual ~PipeCommand() {}
-  void execute() override;
+    // TODO: Add your data members
+public:
+    PipeCommand(const char* cmd_line);
+    virtual ~PipeCommand() {}
+    void execute() override;
 };
 
 class RedirectionCommand : public Command {
- std::string filename;
+    std::string filename;
 
- bool toAppend;
- bool redirected = true;
+    bool toAppend;
+    bool redirected = true;
 
- int monitor_out;
- int opened_file_d;
+    int monitor_out;
+    int opened_file_d;
 
- public:
-  explicit RedirectionCommand(const char* cmd_line);
-  virtual ~RedirectionCommand() = default;
-  void execute() override;
-  void prepare();
-  void cleanup();
+public:
+    explicit RedirectionCommand(const char* cmd_line);
+    virtual ~RedirectionCommand() = default;
+    void execute() override;
+    void prepare();
+    void cleanup();
 };
 
 
 
 class ChpromptCommand : public BuiltInCommand {
 public:
-    explicit ChpromptCommand(const char *cmd_line);
+    explicit ChpromptCommand(const char* cmd_line);
     virtual  ~ChpromptCommand() = default;
     void execute() override;
 };
 
 class PathWorkDirCommand : public BuiltInCommand {
 public:
-    explicit PathWorkDirCommand(const char *cmd_line);
+    explicit PathWorkDirCommand(const char* cmd_line);
 
     virtual  ~PathWorkDirCommand() = default;
 
@@ -77,10 +77,10 @@ public:
 
 class ChangeDirCommand : public BuiltInCommand {
 public:
-  char **plastPwd;
-  ChangeDirCommand(const char *cmd_line, char **plastPwd);
-  virtual ~ChangeDirCommand() {}
-  void execute() override;
+    char** plastPwd;
+    ChangeDirCommand(const char* cmd_line, char** plastPwd);
+    virtual ~ChangeDirCommand() {}
+    void execute() override;
 };
 /*
 class GetCurrDirCommand : public BuiltInCommand {
@@ -91,21 +91,21 @@ class GetCurrDirCommand : public BuiltInCommand {
 };
 */
 class ShowPidCommand : public BuiltInCommand {
- public:
-  ShowPidCommand(const char* cmd_line);
-  virtual ~ShowPidCommand() {}
-  void execute() override;
-};
-
-
-
-class JobsList;
-class QuitCommand : public BuiltInCommand {
-    JobsList* jobs;
-    QuitCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~QuitCommand() {}
+public:
+    ShowPidCommand(const char* cmd_line);
+    virtual ~ShowPidCommand() {}
     void execute() override;
 };
+
+
+
+//class JobsList;
+//class QuitCommand : public BuiltInCommand {
+// JobsList* jobs;
+// QuitCommand(const char* cmd_line, JobsList* jobs);
+//  virtual ~QuitCommand() {}
+// void execute() override;
+//};
 
 class JobsList {
 public:
@@ -116,13 +116,14 @@ public:
         pid_t job_pid;
         bool isStopped;
 
-       JobEntry(std::string& command_line, int job_id, pid_t job_pid, bool isStopped);
+        JobEntry(std::string& command_line, int job_id, pid_t job_pid, bool isStopped);
     };
-      int max_job_id;
-      std::vector <JobEntry> job_vector;
-      int unfinished_size;
+    int max_job_id;
+    std::vector <JobEntry> job_vector;
+    int unfinished_size;
 
-     JobsList();
+    //JobsList();
+    JobsList(int max_job_id,std::vector <JobEntry> job_vector,int unfinished_size);
     ~JobsList() = default;
     void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
@@ -160,6 +161,13 @@ public:
     void execute() override;
 };
 
+class QuitCommand : public BuiltInCommand {
+    JobsList* jobs;
+public:
+    QuitCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~QuitCommand() {}
+    void execute() override;
+};
 class ChmodCommand : public BuiltInCommand {
 public:
     ChmodCommand(const char* cmd_line);
@@ -170,25 +178,27 @@ public:
 
 
 class SmallShell {
- private:
-  // TODO: Add your data members
-  SmallShell();
- public:
+private:
+    // TODO: Add your data members
+    SmallShell();
+public:
     std::string prompt;
     //pid_t pid;
-    char *plastPwd;
+    char* plastPwd;
+    JobsList* jobs;
+    int fgp = -1 ;
 
-  Command *CreateCommand(const char* cmd_line);
-  SmallShell(SmallShell const&)      = delete; // disable copy ctor
-  void operator=(SmallShell const&)  = delete; // disable = operator
-  static SmallShell& getInstance() // make SmallShell singleton
-  {
-    static SmallShell instance; // Guaranteed to be destroyed.
-    // Instantiated on first use.
-    return instance;
-  }
-  ~SmallShell();
-  void executeCommand(const char* cmd_line);
-  // TODO: add extra methods as needed
+    Command* CreateCommand(const char* cmd_line);
+    SmallShell(SmallShell const&) = delete; // disable copy ctor
+    void operator=(SmallShell const&) = delete; // disable = operator
+    static SmallShell& getInstance() // make SmallShell singleton
+    {
+        static SmallShell instance; // Guaranteed to be destroyed.
+        // Instantiated on first use.
+        return instance;
+    }
+    ~SmallShell(){ delete jobs;};
+    void executeCommand(const char* cmd_line);
+    // TODO: add extra methods as needed
 };
 #endif //SMASH_COMMAND_H_
