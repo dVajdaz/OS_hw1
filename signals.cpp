@@ -17,6 +17,8 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num) {
-  // TODO: Add your implementation
+    std::cout << "smash: got an alarm" << std::endl;
+    SmallShell &smash = SmallShell::getInstance();
+    smash.alarms->removeFinishedAlarms();
 }
 

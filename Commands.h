@@ -22,12 +22,12 @@ public:
 class BuiltInCommand : public Command {
 public:
     explicit BuiltInCommand(const char* cmd_line);
-    virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char* cmd_line);
+    const char* timeout_cmd;
+    ExternalCommand(const char *cmd_line, const char *timeout_cmd);
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -98,15 +98,6 @@ public:
 };
 
 
-
-//class JobsList;
-//class QuitCommand : public BuiltInCommand {
-// JobsList* jobs;
-// QuitCommand(const char* cmd_line, JobsList* jobs);
-//  virtual ~QuitCommand() {}
-// void execute() override;
-//};
-
 class JobsList {
 public:
     class JobEntry {
@@ -131,40 +122,33 @@ public:
     void removeFinishedJobs();
     JobEntry* getJobById(int jobId);
     void removeJobById(int jobId);
-    JobEntry* getLastJob(int* lastJobId);
-    JobEntry* getLastStoppedJob(int* jobId);
-    bool isListEmpty();
     // TODO: Add extra methods or modify exisitng ones as needed
 };
 
 class JobsCommand : public BuiltInCommand {
-    JobsList* jobs;
 public:
-    JobsCommand(const char* cmd_line, JobsList* jobs);
+    JobsCommand(const char* cmd_line);
     virtual ~JobsCommand() {}
     void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
-    JobsList* jobs;
 public:
-    KillCommand(const char* cmd_line, JobsList* jobs);
+    KillCommand(const char* cmd_line);
     virtual ~KillCommand() {}
     void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
-    JobsList* jobs;
 public:
-    ForegroundCommand(const char* cmd_line, JobsList* jobs);
+    ForegroundCommand(const char* cmd_line);
     virtual ~ForegroundCommand() {}
     void execute() override;
 };
 
 class QuitCommand : public BuiltInCommand {
-    JobsList* jobs;
 public:
-    QuitCommand(const char* cmd_line, JobsList* jobs);
+    QuitCommand(const char* cmd_line);
     virtual ~QuitCommand() {}
     void execute() override;
 };
@@ -174,8 +158,32 @@ public:
     virtual ~ChmodCommand() {}
     void execute() override;
 };
+class TimeoutCommand: public Command{
+public:
+    TimeoutCommand(const char* cmd_line);
+    virtual ~TimeoutCommand() {}
+    void execute() override;
+};
 
+class AlarmList{
+public:
+    class AlarmEntry{
+    public:
+        std::string command;
+        time_t created;
+        time_t duration;
+        time_t time_limit;
+        pid_t pid;
+        AlarmEntry(std::string command, time_t time_created, time_t duration, pid_t pid);
+        ~AlarmEntry() = default;
+    };
 
+    std::vector<AlarmEntry> alarm_vector;
+
+    AlarmList(std::vector <AlarmEntry> alarm_vector);
+    void addAlarm(std::string command, time_t duration, pid_t pid);
+    void removeFinishedAlarms();
+};
 
 class SmallShell {
 private:
@@ -186,9 +194,10 @@ public:
     //pid_t pid;
     char* plastPwd;
     JobsList* jobs;
+    AlarmList* alarms;
     int fgp = -1 ;
 
-    Command* CreateCommand(const char* cmd_line);
+    Command *CreateCommand(const char *cmd_line, const char *string);
     SmallShell(SmallShell const&) = delete; // disable copy ctor
     void operator=(SmallShell const&) = delete; // disable = operator
     static SmallShell& getInstance() // make SmallShell singleton
@@ -197,8 +206,8 @@ public:
         // Instantiated on first use.
         return instance;
     }
-    ~SmallShell(){ delete jobs;};
-    void executeCommand(const char* cmd_line);
+    ~SmallShell();
+    void executeCommand(const char *cmd_line, const char *string);
     // TODO: add extra methods as needed
 };
 #endif //SMASH_COMMAND_H_
